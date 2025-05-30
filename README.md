@@ -1,6 +1,6 @@
-# Deno Chrome Extension Template
+# Page to Markdown
 
-A template repository for creating Chrome extensions using Deno.
+現在のページをマークダウンに変換してクリップボードにコピーするChrome拡張機能
 
 ## License
 

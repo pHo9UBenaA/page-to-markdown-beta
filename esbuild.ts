@@ -1,7 +1,7 @@
 /// <reference lib="deno.ns" />
 
 import { copy, ensureDir } from "jsr:@std/fs";
-import { build, stop } from "npm:esbuild";
+import { build, stop } from "esbuild";
 import { denoPlugins } from "jsr:@luca/esbuild-deno-loader";
 
 const SRC_DIR = "./src";
@@ -24,19 +24,15 @@ const copyAssets = async () => {
   }
 };
 
-const getEntryFile = async (): Promise<string> => {
-  for await (const entry of Deno.readDir(SRC_DIR)) {
-    if (entry.isFile && entry.name.endsWith(".ts")) {
-      return `${SRC_DIR}/${entry.name}`;
-    }
-  }
-  throw new Error("No entry file found in src directory.");
-};
+const bundleWithEsbuild = async () => {
+  const entryPoints = {
+    background: `${SRC_DIR}/background.ts`,
+    "content-script": `${SRC_DIR}/content-script.ts`,
+  };
 
-const bundleWithEsbuild = async (entryFile: string) => {
   const result = await build({
-    entryPoints: [entryFile],
-    outfile: `${DIST_DIR}/background.js`,
+    entryPoints,
+    outdir: DIST_DIR,
     bundle: true,
     minify: shouldMinify,
     platform: "browser",
@@ -54,8 +50,7 @@ const bundleWithEsbuild = async (entryFile: string) => {
 const main = async () => {
   await initializeDist();
   await copyAssets();
-  const entryFile = await getEntryFile();
-  await bundleWithEsbuild(entryFile);
+  await bundleWithEsbuild();
 };
 
 main().catch((err) => console.error("Build failed:", err.message));
