@@ -1,0 +1,6 @@
+name: Call Deno CI
+on: pull_request
+
+jobs:
+  call-deno-ci:
+    uses: pHo9UBenaA/gh-action-templates/.github/workflows/deno-ci.yml@master

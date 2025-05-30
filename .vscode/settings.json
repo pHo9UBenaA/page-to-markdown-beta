@@ -1,0 +1,9 @@
+{
+  "deno.path": "/usr/local/bin/deno",
+  "deno.enable": true,
+  "deno.lint": true,
+  "editor.formatOnSave": true,
+  "[json][javascript][javascriptreact][typescript][typescriptreact]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  }
+}
