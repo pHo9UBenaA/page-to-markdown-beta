@@ -1,16 +1,17 @@
 /**
- * @mizchi/readabilityを使用してページをマークダウンに変換する機能
+ * @mozilla/readabilityを使用してページをマークダウンに変換する機能
  * - 現在のページのHTMLを解析
  * - 記事内容を抽出してマークダウン形式に変換
  * - claude.aiサイト専用の特別処理
  */
 
-import { extract, toMarkdown } from "@mizchi/readability";
+import { Readability } from "@mozilla/readability";
 import type { ConvertResult, ReadabilityExtractResult } from "../types.ts";
 
 const DEFAULT_ERROR_MESSAGE = "ページの変換に失敗しました";
 const MINIMUM_CHAR_THRESHOLD = 100;
-const ROOT_PROPERTY_ERROR = "抽出されたコンテンツにrootプロパティがありません";
+const CONTENT_PROPERTY_ERROR =
+  "抽出されたコンテンツにcontentプロパティがありません";
 const EMPTY_MARKDOWN_ERROR = "変換されたマークダウンが空です";
 const EXTRACTION_ERROR = "記事内容の抽出に失敗しました";
 const CLAUDE_AI_DOMAIN = "claude.ai";
@@ -121,15 +122,18 @@ function processClaudeAiPage(document: Document): ConvertResult {
 
 /**
  * HTMLストリングから記事内容を抽出する
- * readabilityライブラリでの処理を分離し、エラーハンドリングを統一するため
+ * @mozilla/readabilityライブラリでの処理を分離し、エラーハンドリングを統一するため
  */
 function extractPageContent(
   html: string,
-): ReadabilityExtractResult | null {
+): ReadabilityExtractResult {
   try {
-    return extract(html, {
+    // @mozilla/readabilityを使用するためにDOMを作成
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const reader = new Readability(doc, {
       charThreshold: MINIMUM_CHAR_THRESHOLD,
-    }) as ReadabilityExtractResult;
+    });
+    return reader.parse();
   } catch {
     return null;
   }
@@ -137,18 +141,81 @@ function extractPageContent(
 
 /**
  * 抽出した内容をマークダウンに変換する
- * 型安全性を保ちながらreadabilityライブラリのtoMarkdown関数を呼び出すため
+ * HTMLからマークダウンへの変換を行うため
  */
 function convertToMarkdown(
   extractedContent: ReadabilityExtractResult,
 ): string {
-  // @mizchi/readabilityの仕様に基づき、extractedContent.rootを渡す
-  const root = extractedContent.root;
-  if (!root) {
-    throw new Error(ROOT_PROPERTY_ERROR);
+  if (!extractedContent) {
+    throw new Error(EXTRACTION_ERROR);
   }
-  // @mizchi/readabilityのtoMarkdown関数に必要な型アサーション
-  return toMarkdown(root as Parameters<typeof toMarkdown>[0]);
+
+  const content = extractedContent.content;
+  if (!content || content.trim() === "") {
+    throw new Error(CONTENT_PROPERTY_ERROR);
+  }
+
+  // HTMLコンテンツをマークダウンに変換するシンプルな実装
+  return convertHtmlToMarkdown(content);
+}
+
+/**
+ * HTMLをマークダウンに変換する
+ * 基本的なHTMLタグをマークダウン記法に変換するため
+ */
+function convertHtmlToMarkdown(html: string): string {
+  return html
+    // 見出しの変換
+    .replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n")
+    .replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n")
+    .replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n")
+    .replace(/<h4[^>]*>(.*?)<\/h4>/gi, "#### $1\n\n")
+    .replace(/<h5[^>]*>(.*?)<\/h5>/gi, "##### $1\n\n")
+    .replace(/<h6[^>]*>(.*?)<\/h6>/gi, "###### $1\n\n")
+    // 段落の変換
+    .replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n")
+    // 強調の変換
+    .replace(/<(strong|b)[^>]*>(.*?)<\/(strong|b)>/gi, "**$2**")
+    .replace(/<(em|i)[^>]*>(.*?)<\/(em|i)>/gi, "*$2*")
+    // コードの変換
+    .replace(/<code[^>]*>(.*?)<\/code>/gi, "`$1`")
+    .replace(/<pre[^>]*>(.*?)<\/pre>/gi, "```\n$1\n```\n\n")
+    // リンクの変換
+    .replace(/<a[^>]*href=["']([^"']*)["'][^>]*>(.*?)<\/a>/gi, "[$2]($1)")
+    // 画像の変換
+    .replace(
+      /<img[^>]*src=["']([^"']*)["'][^>]*alt=["']([^"']*)["'][^>]*>/gi,
+      "![$2]($1)",
+    )
+    .replace(
+      /<img[^>]*alt=["']([^"']*)["'][^>]*src=["']([^"']*)["'][^>]*>/gi,
+      "![$1]($2)",
+    )
+    .replace(/<img[^>]*src=["']([^"']*)["'][^>]*>/gi, "![]($1)")
+    // リストの変換
+    .replace(/<ul[^>]*>(.*?)<\/ul>/gis, (_match, content) => {
+      return content.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n") + "\n";
+    })
+    .replace(/<ol[^>]*>(.*?)<\/ol>/gis, (_match, content) => {
+      let counter = 1;
+      return content.replace(
+        /<li[^>]*>(.*?)<\/li>/gi,
+        () => `${counter++}. $1\n`,
+      ) + "\n";
+    })
+    // 改行の変換
+    .replace(/<br[^>]*>/gi, "\n")
+    // HTMLタグの除去
+    .replace(/<[^>]+>/g, "")
+    // HTMLエンティティのデコード
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // 余分な空白の除去
+    .replace(/\n\s*\n\s*\n/g, "\n\n")
+    .trim();
 }
 
 /**

@@ -36,6 +36,46 @@ function getExtensionBrowserArgs(extensionPath: string): string[] {
 }
 
 /**
+ * Playwrightブラウザバイナリの自動インストール
+ * 初回実行時やブラウザバイナリが見つからない場合に自動でインストールするため
+ */
+async function ensurePlaywrightBrowsersInstalled(): Promise<void> {
+  try {
+    // 簡単なブラウザ起動テストを実行
+    const testBrowser = await chromium.launch({ headless: true });
+    await testBrowser.close();
+  } catch (_error) {
+    console.log(
+      "Playwrightブラウザが見つかりません。自動インストールを実行します...",
+    );
+
+    // ブラウザバイナリを自動インストール
+    const command = new Deno.Command("deno", {
+      args: [
+        "run",
+        "--allow-env",
+        "--allow-read",
+        "--allow-write",
+        "--allow-run",
+        "--allow-net",
+        "--allow-sys",
+        "npm:playwright@^1.48.0/playwright",
+        "install",
+      ],
+    });
+
+    const process = command.spawn();
+    const status = await process.status;
+
+    if (!status.success) {
+      throw new Error("Playwrightブラウザのインストールに失敗しました");
+    }
+
+    console.log("Playwrightブラウザのインストールが完了しました");
+  }
+}
+
+/**
  * 拡張機能テスト環境の初期化
  * Chrome拡張機能が実際に動作する環境を構築するため
  */
@@ -46,6 +86,8 @@ export async function setupExtensionTestEnvironment(): Promise<{
   extensionId: string;
 }> {
   try {
+    // Playwrightブラウザバイナリの確認・インストール
+    await ensurePlaywrightBrowsersInstalled();
     // 拡張機能のパスを取得
     const extensionPath = resolve("./dist");
     console.log(`拡張機能パス: ${extensionPath}`);

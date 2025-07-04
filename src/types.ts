@@ -50,25 +50,16 @@ export type ExtensionMessage = {
 };
 
 /**
- * readabilityライブラリの抽出結果の型定義
- * @mizchi/readabilityのextract関数の戻り値を表現
+ * @mozilla/readabilityの抽出結果の型定義
+ * Readabilityのparse関数の戻り値を表現
  * マークダウン変換処理で実際に使用される型
  */
 export type ReadabilityExtractResult = {
-  readonly root?: unknown;
-};
-
-/**
- * readabilityの抽出結果（詳細版）
- * 将来的な拡張で使用する可能性がある型
- * より詳細な記事情報を扱う場合の型定義
- */
-export type ExtractedContent = {
-  readonly title: string;
-  readonly content: string;
-  readonly textContent: string;
-  readonly length: number;
-  readonly excerpt: string;
-  readonly byline: string;
-  readonly dir: string;
-};
+  readonly title: string | null | undefined;
+  readonly content: string | null | undefined;
+  readonly textContent: string | null | undefined;
+  readonly length: number | null | undefined;
+  readonly excerpt: string | null | undefined;
+  readonly byline: string | null | undefined;
+  readonly dir: string | null | undefined;
+} | null;
